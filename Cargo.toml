@@ -1,0 +1,54 @@
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+authors = ["Egal"]
+repository = ""
+description = "A short description of the project."
+
+[workspace]
+resolver = "3"
+members = [
+	"crates/infra-core",
+	"crates/infra-rdb/infra-rdb-cfg",
+	"crates/infra-rdb",
+	"crates/infra-web/axum-resp-macro",
+	"crates/infra-web",
+	"crates/infra-tracing",
+]
+
+[workspace.dependencies]
+infra-core = { path = "crates/infra-core" }
+infra-rdb-cfg = { path = "crates/infra-rdb/infra-rdb-cfg" }
+infra-rdb = { path = "crates/infra-rdb" }
+axum-resp-macro = { path = "crates/infra-web/axum-resp-macro" }
+infra-web = { path = "crates/infra-web" }
+infra-tracing = { path = "crates/infra-tracing" }
+
+anyhow = "1"
+axum = { version = "0.8", features = ["tower-log"] }
+axum-macros = "0.5"
+bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "174354d917d0ed0ad5cac5b75135ad34ed2ae80a" }
+bincode = "=2.0.1"
+clap = { version = "4", features = ["derive", "env"] }
+dunce = "1"
+figment = "0.10"
+flate2 = "1"
+http = "1"
+num_cpus = "1"
+proc-macro2 = "1"
+quote = "1"
+rocksdb = "0.24"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = "3"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "parsing"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
+tokio-test = "0.4"
+tower = { version = "0.5", features = ["timeout", "buffer", "limit", "retry", "util"] }
+tracing = { version = "0.1", features = ["release_max_level_info"] }
+tracing-appender = "0.2"
+tracing-subscriber = "0.3"
+utoipa = { version = "5" }
+uuid = { version = "1", features = ["v4"] }

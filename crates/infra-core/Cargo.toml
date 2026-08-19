@@ -1,0 +1,38 @@
+[package]
+name = "infra-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+figment = { workspace = true, features = ["env", "yaml", "toml"] }
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+
+tracing.workspace = true
+
+
+uuid.workspace = true
+clap.workspace = true
+
+[dependencies.tokio]
+workspace = true
+optional = true
+features = ["io-util"]
+
+[dependencies.num_cpus]
+workspace = true
+optional = true
+
+
+
+[features]
+default = ["rt-tokio"]
+rt-tokio = ["tokio", "num_cpus"]
+
+[dev-dependencies]
+tracing-subscriber.workspace = true

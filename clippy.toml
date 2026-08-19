@@ -1,0 +1,13 @@
+stack-size-threshold = 512000
+type-complexity-threshold = 250
+cognitive-complexity-threshold = 25
+too-many-arguments-threshold = 7
+too-many-lines-threshold = 120
+enum-variant-size-threshold = 200
+disallowed-names = [
+	"foo", "bar", "baz",
+	"tmp", "temp",
+	"thing", "stuff",
+	"obj",
+]
+doc-valid-idents = ["OpenAI", "GitHub", "Rust", "Clippy", "Serde"]
