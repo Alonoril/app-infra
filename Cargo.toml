@@ -9,21 +9,21 @@ description = "A short description of the project."
 [workspace]
 resolver = "3"
 members = [
-	"crates/infra-core",
-	"crates/infra-rdb/infra-rdb-cfg",
-	"crates/infra-rdb",
-	"crates/infra-web/axum-resp-macro",
-	"crates/infra-web",
-	"crates/infra-tracing",
+	"infra-core",
+	"infra-rdb/infra-rdb-cfg",
+	"infra-rdb",
+	"infra-web/axum-resp-macro",
+	"infra-web",
+	"infra-tracing",
 ]
 
 [workspace.dependencies]
-infra-core = { path = "crates/infra-core" }
-infra-rdb-cfg = { path = "crates/infra-rdb/infra-rdb-cfg" }
-infra-rdb = { path = "crates/infra-rdb" }
-axum-resp-macro = { path = "crates/infra-web/axum-resp-macro" }
-infra-web = { path = "crates/infra-web" }
-infra-tracing = { path = "crates/infra-tracing" }
+infra-core = { path = "infra-core" }
+infra-rdb-cfg = { path = "infra-rdb/infra-rdb-cfg" }
+infra-rdb = { path = "infra-rdb" }
+axum-resp-macro = { path = "infra-web/axum-resp-macro" }
+infra-web = { path = "infra-web" }
+infra-tracing = { path = "infra-tracing" }
 
 anyhow = "1"
 axum = { version = "0.8", features = ["tower-log"] }

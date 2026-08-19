@@ -35,5 +35,5 @@ cargo clippy --workspace --all-targets -- -D warnings
 ## Integration with milon-indexer
 
 `milon-indexer` consumes these packages through sibling path dependencies such as
-`../app-infra/crates/infra-core`. Package names and public APIs are kept stable, so application crates can continue to
+`../app-infra/infra-core`. Package names and public APIs are kept stable, so application crates can continue to
 depend on them through the indexer's workspace dependency catalog.
