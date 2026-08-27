@@ -38,7 +38,7 @@ http = "1"
 num_cpus = "1"
 proc-macro2 = "1"
 quote = "1"
-rocksdb = "0.24"
+rocksdb = "0.25"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 syn = "3"
