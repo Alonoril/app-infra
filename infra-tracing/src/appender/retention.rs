@@ -49,7 +49,7 @@ pub(super) fn parse_log_date(
 }
 
 pub(super) fn daily_format() -> Vec<FormatItem<'static>> {
-	format_description::parse("[year]-[month]-[day]").expect("daily log date format must be valid")
+	format_description::parse_borrowed::<1>("[year]-[month]-[day]").expect("daily log date format must be valid")
 }
 
 fn matching_log_files(
