@@ -197,7 +197,7 @@ impl RksDB {
 		let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
 		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
-		let result = self.inner.get_cf(cf_handle, k).into_db_res()?;
+		let result = self.inner.get_cf(&cf_handle, k).into_db_res()?;
 		result
 			.map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
 			.transpose()
@@ -225,7 +225,7 @@ impl RksDB {
 		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 		let mut encoded_keys = vec![];
 		for key in keys {
-			encoded_keys.push((cf_handle, <S::Key as KeyCodec<S>>::encode_key(key)?));
+			encoded_keys.push((&cf_handle, <S::Key as KeyCodec<S>>::encode_key(key)?));
 		}
 
 		let results: Vec<Result<Option<Vec<u8>>, rocksdb::Error>> = self.inner.multi_get_cf(encoded_keys);
@@ -255,7 +255,7 @@ impl RksDB {
 		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 		let mut encoded_keys = vec![];
 		for key in keys {
-			encoded_keys.push((cf_handle, <S::Key as KeyCodec<S>>::encode_key(key)?));
+			encoded_keys.push((&cf_handle, <S::Key as KeyCodec<S>>::encode_key(key)?));
 		}
 
 		let results: Vec<Result<Option<Vec<u8>>, rocksdb::Error>> = self.inner.multi_get_cf(encoded_keys);
@@ -287,7 +287,7 @@ impl RksDB {
 	) -> AppResult<SchemaIterator<'_, S>> {
 		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 		Ok(SchemaIterator::new(
-			self.inner.raw_iterator_cf_opt(cf_handle, opts),
+			self.inner.raw_iterator_cf_opt(&cf_handle, opts),
 			direction,
 		))
 	}
@@ -336,8 +336,8 @@ impl RksDB {
 			let cf_handle = self.get_cf_handle(cf_name.as_ref())?;
 			for write_op in rows {
 				match write_op {
-					WriteOp::Value { key, value } => db_batch.put_cf(cf_handle, key, value),
-					WriteOp::Deletion { key } => db_batch.delete_cf(cf_handle, key),
+					WriteOp::Value { key, value } => db_batch.put_cf(&cf_handle, key, value),
+					WriteOp::Deletion { key } => db_batch.delete_cf(&cf_handle, key),
 				}
 			}
 		}
@@ -347,18 +347,18 @@ impl RksDB {
 		Ok(())
 	}
 
-	pub(crate) fn get_cf_handle(&self, cf_name: &str) -> AppResult<&rocksdb::ColumnFamily> {
+	pub(crate) fn get_cf_handle(&self, cf_name: &str) -> AppResult<rocksdb::ColumnFamilyRef<'_>> {
 		self.inner.cf_handle(cf_name).ok_or_else(errors::column_family_missing)
 	}
 
 	/// Flushes a column family's memtable data.
 	pub fn flush_cf(&self, cf_name: &str) -> AppResult<()> {
-		self.inner.flush_cf(self.get_cf_handle(cf_name)?).into_db_res()
+		self.inner.flush_cf(&self.get_cf_handle(cf_name)?).into_db_res()
 	}
 
 	pub fn get_property(&self, cf_name: &str, property_name: &str) -> AppResult<u64> {
 		self.inner
-			.property_int_value_cf(self.get_cf_handle(cf_name)?, property_name)
+			.property_int_value_cf(&self.get_cf_handle(cf_name)?, property_name)
 			.into_db_res()?
 			.ok_or_else(errors::property_missing)
 	}

@@ -268,7 +268,7 @@ impl RksDB {
 	fn delete_raw_key(&self, cf_name: &str, key_bytes: &[u8]) -> AppResult<()> {
 		let cf_handle = self.get_cf_handle(cf_name)?;
 		self.inner
-			.delete_cf(cf_handle, key_bytes)
+			.delete_cf(&cf_handle, key_bytes)
 			.map_err(crate::errors::from_rocksdb_error)?;
 		Ok(())
 	}
