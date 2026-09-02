@@ -209,7 +209,7 @@ where
 	#[cfg(not(feature = "log-json"))]
 	{
 		Layer::new()
-			.with_file(true)
+			// .with_file(true)
 			.with_line_number(true)
 			.with_thread_names(false)
 			.with_thread_ids(false)
