@@ -8,12 +8,14 @@ mod durable_batch;
 mod iterator;
 #[cfg(feature = "ttl")]
 mod ttl;
+mod snapshot;
 mod utils;
 
 // Re-export public types and traits
 pub use batch::{ColumnFamilyName, SchemaBatch};
 pub use core::RksDB;
 pub use durable_batch::{DurableColumnFamilyBatch, DurableWriteBatch, DurableWriteOp};
+pub use snapshot::RksDBSnapshot;
 use infra_rdb_cfg::RocksdbConfig;
 pub use iterator::{ScanDirection, SchemaIterator};
 pub use schema::Schema;

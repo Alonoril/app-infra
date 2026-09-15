@@ -9,7 +9,7 @@ use crate::{
 	},
 };
 use infra_core::result::AppResult;
-use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions};
+use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, IteratorMode, Options, ReadOptions, WriteBatch, WriteOptions};
 use std::{collections::HashSet, fmt, path::Path};
 use tracing::{info, warn};
 
@@ -262,6 +262,35 @@ impl RksDB {
 		let res_vec: Vec<bool> = results.iter().map(|result| matches!(result, Ok(Some(_)))).collect();
 
 		Ok(res_vec)
+	}
+
+	/// Copies raw rows for the selected column families without changing the source database.
+	///
+	/// The operation is intentionally put-only and idempotent. Bounded write batches keep the
+	/// migration memory use independent of the size of a legacy database.
+	pub fn copy_column_families_from(&self, source: &Self, column_families: &[&str]) -> AppResult<u64> {
+		let mut write_options = WriteOptions::default();
+		write_options.set_sync(true);
+		write_options.disable_wal(false);
+		let mut batch = WriteBatch::default();
+		let mut copied = 0_u64;
+
+		for &column_family in column_families {
+			let source_cf = source.get_cf_handle(column_family)?;
+			let destination_cf = self.get_cf_handle(column_family)?;
+			for row in source.inner.iterator_cf(&source_cf, IteratorMode::Start) {
+				let (key, value) = row.into_db_res()?;
+				batch.put_cf(&destination_cf, key, value);
+				copied = copied.saturating_add(1);
+				if batch.len() >= 1024 {
+					self.inner.write_opt(std::mem::take(&mut batch), &write_options).into_db_res()?;
+				}
+			}
+		}
+		if !batch.is_empty() {
+			self.inner.write_opt(batch, &write_options).into_db_res()?;
+		}
+		Ok(copied)
 	}
 
 	/// Writes single record.
