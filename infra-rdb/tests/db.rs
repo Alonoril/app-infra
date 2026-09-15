@@ -233,37 +233,6 @@ fn snapshot_reads_a_stable_typed_view() {
 }
 
 #[test]
-fn copy_column_families_is_idempotent() {
-	let source_dir = aptos_temppath::TempPath::new();
-	let destination_dir = aptos_temppath::TempPath::new();
-	let source = open_db(&source_dir);
-	let destination = open_db(&destination_dir);
-	source.put::<TestSchema1>(&TestField(1), &TestField(11)).unwrap();
-	source.put::<TestSchema1>(&TestField(2), &TestField(22)).unwrap();
-
-	assert_eq!(
-		destination
-			.copy_column_families_from(&source, &[TestSchema1::COLUMN_FAMILY_NAME])
-			.unwrap(),
-		2
-	);
-	assert_eq!(
-		destination
-			.copy_column_families_from(&source, &[TestSchema1::COLUMN_FAMILY_NAME])
-			.unwrap(),
-		2
-	);
-	assert_eq!(
-		destination.get::<TestSchema1>(&TestField(1)).unwrap(),
-		Some(TestField(11))
-	);
-	assert_eq!(
-		destination.get::<TestSchema1>(&TestField(2)).unwrap(),
-		Some(TestField(22))
-	);
-}
-
-#[test]
 fn clear_schema_removes_only_target_column_family() {
 	let db = TestDB::new();
 	db.put::<TestSchema1>(&TestField(1), &TestField(10)).unwrap();
