@@ -9,7 +9,7 @@ use crate::{
 	},
 };
 use infra_core::result::AppResult;
-use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions, WriteOptions};
+use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions};
 use std::{collections::HashSet, fmt, path::Path};
 use tracing::{info, warn};
 
