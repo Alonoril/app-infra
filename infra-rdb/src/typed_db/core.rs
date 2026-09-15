@@ -9,7 +9,9 @@ use crate::{
 	},
 };
 use infra_core::result::AppResult;
-use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, IteratorMode, Options, ReadOptions, WriteBatch, WriteOptions};
+use rocksdb::{
+	ColumnFamilyDescriptor, DBCompressionType, IteratorMode, Options, ReadOptions, WriteBatch, WriteOptions,
+};
 use std::{collections::HashSet, fmt, path::Path};
 use tracing::{info, warn};
 
@@ -283,7 +285,9 @@ impl RksDB {
 				batch.put_cf(&destination_cf, key, value);
 				copied = copied.saturating_add(1);
 				if batch.len() >= 1024 {
-					self.inner.write_opt(std::mem::take(&mut batch), &write_options).into_db_res()?;
+					self.inner
+						.write_opt(std::mem::take(&mut batch), &write_options)
+						.into_db_res()?;
 				}
 			}
 		}

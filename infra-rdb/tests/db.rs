@@ -253,8 +253,14 @@ fn copy_column_families_is_idempotent() {
 			.unwrap(),
 		2
 	);
-	assert_eq!(destination.get::<TestSchema1>(&TestField(1)).unwrap(), Some(TestField(11)));
-	assert_eq!(destination.get::<TestSchema1>(&TestField(2)).unwrap(), Some(TestField(22)));
+	assert_eq!(
+		destination.get::<TestSchema1>(&TestField(1)).unwrap(),
+		Some(TestField(11))
+	);
+	assert_eq!(
+		destination.get::<TestSchema1>(&TestField(2)).unwrap(),
+		Some(TestField(22))
+	);
 }
 
 #[test]

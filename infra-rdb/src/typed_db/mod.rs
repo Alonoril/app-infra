@@ -6,19 +6,19 @@ mod batch;
 mod core;
 mod durable_batch;
 mod iterator;
+mod snapshot;
 #[cfg(feature = "ttl")]
 mod ttl;
-mod snapshot;
 mod utils;
 
 // Re-export public types and traits
 pub use batch::{ColumnFamilyName, SchemaBatch};
 pub use core::RksDB;
 pub use durable_batch::{DurableColumnFamilyBatch, DurableWriteBatch, DurableWriteOp};
-pub use snapshot::RksDBSnapshot;
 use infra_rdb_cfg::RocksdbConfig;
 pub use iterator::{ScanDirection, SchemaIterator};
 pub use schema::Schema;
+pub use snapshot::RksDBSnapshot;
 pub use utils::IntoDbResult;
 pub(crate) use utils::write_options_from_config;
 
