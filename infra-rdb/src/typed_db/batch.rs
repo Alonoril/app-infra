@@ -10,6 +10,33 @@ pub enum WriteOp {
 	Deletion { key: Vec<u8> },
 }
 
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn append_preserves_repeated_key_operation_order_and_moves_buffers() {
+		let key = vec![41];
+		let value = vec![9; 32];
+		let pointer = value.as_ptr();
+		let mut first = SchemaBatch::from_rows(HashMap::from([(
+			Cow::Borrowed("facts"),
+			vec![WriteOp::Deletion { key: key.clone() }],
+		)]));
+		let second = SchemaBatch::from_rows(HashMap::from([(
+			Cow::Borrowed("facts"),
+			vec![WriteOp::Value { key, value }],
+		)]));
+		first.append(second);
+		let mut rows = first.into_rows();
+		let operations = rows.remove("facts").unwrap();
+		assert!(matches!(&operations[0], WriteOp::Deletion { key } if key == &[41]));
+		assert!(
+			matches!(&operations[1], WriteOp::Value { key, value } if key == &[41] && value == &[9; 32] && value.as_ptr() == pointer)
+		);
+	}
+}
+
 pub(crate) type SchemaBatchRows = HashMap<Cow<'static, str>, Vec<WriteOp>>;
 
 /// `SchemaBatch` holds a consolidate of updates that can be applied to a DB atomically. The updates
@@ -31,6 +58,20 @@ impl SchemaBatch {
 	/// Creates an empty batch.
 	pub fn new() -> Self {
 		Self::default()
+	}
+
+	/// Moves a private batch into this one, preserving operation order within each column family.
+	/// Key/value buffers are retained; callers must append fragments in their logical order.
+	pub fn append(&mut self, other: Self) {
+		let rows = self.rows.get_mut().expect("RdbBatchAppend: poisoned lock");
+		for (column_family, mut operations) in other.into_rows() {
+			match rows.entry(column_family) {
+				std::collections::hash_map::Entry::Vacant(entry) => {
+					entry.insert(operations);
+				}
+				std::collections::hash_map::Entry::Occupied(mut entry) => entry.get_mut().append(&mut operations),
+			}
+		}
 	}
 
 	/// Adds an insert/update operation to the batch.

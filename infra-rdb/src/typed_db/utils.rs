@@ -10,9 +10,8 @@ pub(crate) enum OpenMode<'a> {
 	Secondary(&'a Path),
 }
 
-/// For now we always use synchronous writes. This makes sure that once the operation returns
-/// `Ok(())` the data is persisted even if the machine crashes. In the future we might consider
-/// selectively turning this off for some non-critical writes to improve performance.
+/// Default options for internal callers that require synchronous persistence.
+/// Configured database opens may deliberately use throughput-oriented options instead.
 pub(crate) fn default_write_options() -> rocksdb::WriteOptions {
 	let mut opts = rocksdb::WriteOptions::default();
 	opts.set_sync(true);

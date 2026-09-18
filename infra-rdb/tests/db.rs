@@ -185,6 +185,18 @@ fn durable_batch_sync_applies_operations() {
 }
 
 #[test]
+fn durable_batch_unlogged_applies_operations() {
+	let db = TestDB::new();
+	let batch = SchemaBatch::new();
+	batch.put::<TestSchema1>(&TestField(1), &TestField(11)).unwrap();
+
+	db.write_durable_batch_unlogged(DurableWriteBatch::from_schema_batch(batch))
+		.unwrap();
+
+	assert_eq!(db.get::<TestSchema1>(&TestField(1)).unwrap(), Some(TestField(11)));
+}
+
+#[test]
 fn test_schema_put_get() {
 	let db = TestDB::new();
 

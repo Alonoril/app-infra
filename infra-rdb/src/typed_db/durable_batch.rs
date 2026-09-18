@@ -8,8 +8,53 @@ use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DurableWriteOp {
-	Value { key: Vec<u8>, value: Vec<u8> },
-	Deletion { key: Vec<u8> },
+	Value {
+		#[serde(serialize_with = "serialize_buffer")]
+		key: Vec<u8>,
+		#[serde(serialize_with = "serialize_buffer")]
+		value: Vec<u8>,
+	},
+	Deletion {
+		#[serde(serialize_with = "serialize_buffer")]
+		key: Vec<u8>,
+	},
+}
+
+// Binary serializers encode bytes as the same length-prefixed u8 sequence, but can copy the
+// whole buffer instead of visiting each byte. Deserialization retains the legacy Vec format.
+fn serialize_buffer<S: serde::Serializer>(buffer: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+	serializer.serialize_bytes(buffer)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[derive(Serialize)]
+	struct Buffer<'a>(#[serde(serialize_with = "serialize_buffer")] &'a [u8]);
+
+	#[test]
+	fn bulk_buffer_serialization_keeps_legacy_wire_format() {
+		let buffer = [0, 127, 128, 255];
+		let encoded = bcs::to_bytes(&Buffer(&buffer)).unwrap();
+		assert_eq!(encoded, vec![4, 0, 127, 128, 255]);
+		let legacy: Vec<u8> = bcs::from_bytes(&encoded).unwrap();
+		assert_eq!(legacy, buffer);
+	}
+
+	#[test]
+	fn durable_operations_decode_legacy_key_and_value_buffers() {
+		let encoded = vec![0, 2, 41, 42, 3, 0, 128, 255];
+		let operation: DurableWriteOp = bcs::from_bytes(&encoded).unwrap();
+		assert_eq!(
+			operation,
+			DurableWriteOp::Value {
+				key: vec![41, 42],
+				value: vec![0, 128, 255]
+			}
+		);
+		assert_eq!(bcs::to_bytes(&operation).unwrap(), encoded);
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
