@@ -1,8 +1,8 @@
 use crate::{
-	errors::{self, RdbDetail},
+	errors,
 	typed_db::{
 		batch::{SchemaBatch, WriteOp},
-		durable_batch::{DurableWriteBatch, DurableWriteOp},
+		durable_batch::DurableWriteBatch,
 		iterator::{ScanDirection, SchemaIterator},
 		schema::{KeyCodec, Schema, ValueCodec},
 		utils::{DeUnc, IntoDbResult, OpenMode, default_write_options},
@@ -321,49 +321,6 @@ impl RksDB {
 		self.write_schemas(batch.into_schema_batch()?)
 	}
 
-	pub fn write_durable_batch_sync(&self, batch: DurableWriteBatch) -> AppResult<()> {
-		let mut options = rocksdb::WriteOptions::default();
-		options.set_sync(true);
-		options.disable_wal(false);
-		self.write_durable_batch_with_options(batch, &options)
-	}
-
-	/// Applies a batch without an additional RocksDB WAL record or fsync.
-	///
-	/// Callers must already have a durable recovery record for the batch. The
-	/// indexer uses this mode after persisting its commit journal, so a crash
-	/// before the memtable is flushed leaves the journal available for replay.
-	pub fn write_durable_batch_unlogged(&self, batch: DurableWriteBatch) -> AppResult<()> {
-		let mut options = rocksdb::WriteOptions::default();
-		options.set_sync(false);
-		options.disable_wal(true);
-		self.write_durable_batch_with_options(batch, &options)
-	}
-
-	fn write_durable_batch_with_options(
-		&self,
-		batch: DurableWriteBatch,
-		options: &rocksdb::WriteOptions,
-	) -> AppResult<()> {
-		let mut db_batch = rocksdb::WriteBatch::default();
-		let mut column_families = HashSet::with_capacity(batch.column_families.len());
-		for column_family_batch in batch.column_families {
-			if !column_families.insert(column_family_batch.column_family.clone()) {
-				return Err(errors::invalid_params(RdbDetail::ColumnFamily));
-			}
-			let cf_handle = self.get_cf_handle(&column_family_batch.column_family)?;
-			for write_op in column_family_batch.operations {
-				match write_op {
-					DurableWriteOp::Value { key, value } => db_batch.put_cf(&cf_handle, key, value),
-					DurableWriteOp::Deletion { key } => db_batch.delete_cf(&cf_handle, key),
-				}
-			}
-		}
-
-		self.inner.write_opt(db_batch, options).into_db_res()?;
-		Ok(())
-	}
-
 	fn write_schemas_with_options(&self, batch: SchemaBatch, options: &rocksdb::WriteOptions) -> AppResult<()> {
 		let rows_locked = batch.rows.lock().expect("Cannot currently handle a poisoned lock");
 
@@ -414,3 +371,7 @@ impl Drop for RksDB {
 		info!(rocksdb_name = self.name, "Dropped RocksDB.");
 	}
 }
+
+#[cfg(test)]
+#[path = "durable_write_metrics_tests.rs"]
+mod durable_write_metrics_tests;
