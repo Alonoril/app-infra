@@ -29,6 +29,7 @@ fn serialize_buffer<S: serde::Serializer>(buffer: &[u8], serializer: S) -> Resul
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::collections::HashMap;
 
 	#[derive(Serialize)]
 	struct Buffer<'a>(#[serde(serialize_with = "serialize_buffer")] &'a [u8]);
@@ -55,6 +56,44 @@ mod tests {
 		);
 		assert_eq!(bcs::to_bytes(&operation).unwrap(), encoded);
 	}
+
+	#[test]
+	fn append_schema_batch_preserves_operation_order_and_existing_buffers() {
+		let original_value = vec![7; 32];
+		let original_pointer = original_value.as_ptr();
+		let mut batch = DurableWriteBatch {
+			column_families: vec![DurableColumnFamilyBatch {
+				column_family: "facts".to_owned(),
+				operations: vec![DurableWriteOp::Value {
+					key: vec![1],
+					value: original_value,
+				}],
+			}],
+		};
+		let tail = SchemaBatch::from_rows(HashMap::from([
+			(Cow::Borrowed("facts"), vec![WriteOp::Deletion { key: vec![1] }]),
+			(
+				Cow::Borrowed("meta"),
+				vec![WriteOp::Value {
+					key: vec![2],
+					value: vec![3],
+				}],
+			),
+		]));
+
+		batch.append_schema_batch(tail);
+
+		assert_eq!(batch.column_families.len(), 2);
+		let facts = &batch.column_families[0].operations;
+		assert!(matches!(&facts[0], DurableWriteOp::Value { value, .. } if value.as_ptr() == original_pointer));
+		assert!(matches!(&facts[1], DurableWriteOp::Deletion { key } if key == &[1]));
+		assert!(
+			batch
+				.column_families
+				.iter()
+				.any(|column_family| column_family.column_family == "meta")
+		);
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +108,22 @@ pub struct DurableWriteBatch {
 }
 
 impl DurableWriteBatch {
+	/// Appends typed operations after the existing operations in each column family.
+	/// Existing key and value buffers stay owned by this batch without conversion.
+	pub fn append_schema_batch(&mut self, batch: SchemaBatch) {
+		for mut incoming in Self::from_schema_batch(batch).column_families {
+			if let Some(existing) = self
+				.column_families
+				.iter_mut()
+				.find(|existing| existing.column_family == incoming.column_family)
+			{
+				existing.operations.append(&mut incoming.operations);
+			} else {
+				self.column_families.push(incoming);
+			}
+		}
+	}
+
 	pub fn from_schema_batch(batch: SchemaBatch) -> Self {
 		let column_families = batch
 			.into_rows()
