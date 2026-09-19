@@ -20,6 +20,26 @@ pub struct DurableWriteStats {
 	pub sync: bool,
 }
 
+/// A native batch bound to the database that resolved its column families.
+/// Preparing it never writes state; `write` preserves the requested WAL/sync mode.
+pub struct PreparedDurableWrite<'a> {
+	db: &'a RksDB,
+	batch: rocksdb::WriteBatch,
+	stats: DurableWriteStats,
+}
+
+impl PreparedDurableWrite<'_> {
+	pub fn write(mut self) -> AppResult<DurableWriteStats> {
+		let mut options = rocksdb::WriteOptions::default();
+		options.set_sync(self.stats.sync);
+		options.disable_wal(!self.stats.wal_enabled);
+		let write_started = Instant::now();
+		self.db.inner.write_opt(self.batch, &options).into_db_res()?;
+		self.stats.write = write_started.elapsed();
+		Ok(self.stats)
+	}
+}
+
 impl RksDB {
 	pub fn write_durable_batch_sync(&self, batch: DurableWriteBatch) -> AppResult<()> {
 		self.write_durable_batch_sync_with_stats(batch).map(|_| ())
@@ -27,6 +47,10 @@ impl RksDB {
 
 	pub fn write_durable_batch_sync_with_stats(&self, batch: DurableWriteBatch) -> AppResult<DurableWriteStats> {
 		self.write_durable_batch_measured(batch, true, true)
+	}
+
+	pub fn prepare_durable_batch_sync(&self, batch: DurableWriteBatch) -> AppResult<PreparedDurableWrite<'_>> {
+		self.prepare_durable_batch(batch, true, true)
 	}
 
 	/// Requires a complete, durable application recovery protocol. A successful write
@@ -45,6 +69,15 @@ impl RksDB {
 		wal_enabled: bool,
 		sync: bool,
 	) -> AppResult<DurableWriteStats> {
+		self.prepare_durable_batch(batch, wal_enabled, sync)?.write()
+	}
+
+	fn prepare_durable_batch(
+		&self,
+		batch: DurableWriteBatch,
+		wal_enabled: bool,
+		sync: bool,
+	) -> AppResult<PreparedDurableWrite<'_>> {
 		let started = Instant::now();
 		let mut db_batch = rocksdb::WriteBatch::default();
 		let mut column_families = HashSet::with_capacity(batch.column_families.len());
@@ -76,12 +109,10 @@ impl RksDB {
 		}
 		stats.native_bytes = db_batch.size_in_bytes() as u64;
 		stats.native_build = started.elapsed();
-		let mut options = rocksdb::WriteOptions::default();
-		options.set_sync(sync);
-		options.disable_wal(!wal_enabled);
-		let write_started = Instant::now();
-		self.inner.write_opt(db_batch, &options).into_db_res()?;
-		stats.write = write_started.elapsed();
-		Ok(stats)
+		Ok(PreparedDurableWrite {
+			db: self,
+			batch: db_batch,
+			stats,
+		})
 	}
 }

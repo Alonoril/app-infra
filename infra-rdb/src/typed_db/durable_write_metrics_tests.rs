@@ -38,3 +38,26 @@ fn durable_write_metrics_count_actual_operations_and_preserve_order() {
 	assert_eq!(stats.puts + stats.deletes, 0);
 	assert!(!stats.wal_enabled && !stats.sync);
 }
+
+#[test]
+fn prepared_durable_batch_does_not_write_until_commit() {
+	let directory = tempfile::tempdir().unwrap();
+	let mut options = Options::default();
+	options.create_if_missing(true);
+	let db = RksDB::open(directory.path().join("db"), "prepared", vec!["default"], &options).unwrap();
+	let batch = DurableWriteBatch {
+		column_families: vec![DurableColumnFamilyBatch {
+			column_family: "default".into(),
+			operations: vec![DurableWriteOp::Value {
+				key: b"prepared".to_vec(),
+				value: b"durable".to_vec(),
+			}],
+		}],
+	};
+	let prepared = db.prepare_durable_batch_sync(batch).unwrap();
+	assert!(db.inner.get(b"prepared").unwrap().is_none());
+	let stats = prepared.write().unwrap();
+	assert!(stats.wal_enabled && stats.sync);
+	assert_eq!(stats.puts, 1);
+	assert_eq!(db.inner.get(b"prepared").unwrap().unwrap(), b"durable");
+}
