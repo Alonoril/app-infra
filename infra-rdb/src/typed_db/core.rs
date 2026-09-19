@@ -223,23 +223,25 @@ impl RksDB {
 
 	pub fn multi_get<S: Schema>(&self, keys: &[S::Key]) -> AppResult<Vec<Option<S::Value>>> {
 		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
-		let mut encoded_keys = vec![];
+		let mut encoded_keys = Vec::with_capacity(keys.len());
 		for key in keys {
 			encoded_keys.push((&cf_handle, <S::Key as KeyCodec<S>>::encode_key(key)?));
 		}
 
 		let results: Vec<Result<Option<Vec<u8>>, rocksdb::Error>> = self.inner.multi_get_cf(encoded_keys);
-		let mut res_vec = Vec::with_capacity(results.len());
-		for result in results {
-			let value = result.into_db_res()?;
-			res_vec.push(
-				value
-					.map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
-					.transpose()?,
-			);
-		}
+		decode_multi_get::<S>(results)
+	}
 
-		Ok(res_vec)
+	/// Reads already encoded schema keys without allocating a key buffer per lookup.
+	/// Callers must supply the exact bytes produced by `S::Key::encode_key`.
+	pub fn multi_get_encoded<'a, S: Schema>(
+		&self,
+		keys: impl IntoIterator<Item = &'a [u8]>,
+	) -> AppResult<Vec<Option<S::Value>>> {
+		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
+		let results: Vec<Result<Option<Vec<u8>>, rocksdb::Error>> =
+			self.inner.multi_get_cf(keys.into_iter().map(|key| (&cf_handle, key)));
+		decode_multi_get::<S>(results)
 	}
 
 	pub fn multi_get_with_keys<'a, S: Schema>(
@@ -364,6 +366,21 @@ impl RksDB {
 			.into_db_res()?;
 		Ok(())
 	}
+}
+
+fn decode_multi_get<S: Schema>(
+	results: Vec<Result<Option<Vec<u8>>, rocksdb::Error>>,
+) -> AppResult<Vec<Option<S::Value>>> {
+	let mut values = Vec::with_capacity(results.len());
+	for result in results {
+		let value = result.into_db_res()?;
+		values.push(
+			value
+				.map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
+				.transpose()?,
+		);
+	}
+	Ok(values)
 }
 
 impl Drop for RksDB {

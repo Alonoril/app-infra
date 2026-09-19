@@ -135,6 +135,20 @@ impl std::ops::Deref for TestDB {
 }
 
 #[test]
+fn encoded_multi_get_preserves_order_and_missing_values() {
+	let db = TestDB::new();
+	db.put::<TestSchema1>(&TestField(1), &TestField(11)).unwrap();
+	db.put::<TestSchema1>(&TestField(3), &TestField(33)).unwrap();
+	let keys = [TestField(3), TestField(2), TestField(1)];
+	let encoded = keys.iter().map(TestField::to_bytes).collect::<Vec<_>>();
+	let borrowed = db
+		.multi_get_encoded::<TestSchema1>(encoded.iter().map(Vec::as_slice))
+		.unwrap();
+	assert_eq!(borrowed, db.multi_get::<TestSchema1>(&keys).unwrap());
+	assert_eq!(borrowed, vec![Some(TestField(33)), None, Some(TestField(11))]);
+}
+
+#[test]
 fn durable_batch_round_trip_preserves_put_delete_and_is_idempotent() {
 	let db = TestDB::new();
 	db.put::<TestSchema1>(&TestField(2), &TestField(22)).unwrap();
