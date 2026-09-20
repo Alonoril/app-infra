@@ -5,6 +5,7 @@ use std::{
 	collections::HashSet,
 	time::{Duration, Instant},
 };
+use tracing::debug;
 
 /// Encoded logical bytes and native batch size are different from disk/WAL bytes.
 #[derive(Clone, Copy, Debug, Default)]
@@ -87,25 +88,50 @@ impl RksDB {
 			..Default::default()
 		};
 		for column_family_batch in batch.column_families {
-			if !column_families.insert(column_family_batch.column_family.clone()) {
+			let column_family = column_family_batch.column_family;
+			let operations = column_family_batch.operations;
+			if !column_families.insert(column_family.clone()) {
 				return Err(errors::invalid_params(RdbDetail::ColumnFamily));
 			}
-			let cf_handle = self.get_cf_handle(&column_family_batch.column_family)?;
-			for write_op in column_family_batch.operations {
+			let cf_handle = self.get_cf_handle(&column_family)?;
+			let family_started = Instant::now();
+			let family_native_start = db_batch.size_in_bytes();
+			let mut family_key_bytes = 0_u64;
+			let mut family_value_bytes = 0_u64;
+			let mut family_puts = 0_u64;
+			let mut family_deletes = 0_u64;
+			for write_op in operations {
 				match write_op {
 					DurableWriteOp::Value { key, value } => {
 						stats.puts += 1;
 						stats.key_bytes += key.len() as u64;
 						stats.value_bytes += value.len() as u64;
+						family_puts += 1;
+						family_key_bytes += key.len() as u64;
+						family_value_bytes += value.len() as u64;
 						db_batch.put_cf(&cf_handle, key, value);
 					}
 					DurableWriteOp::Deletion { key } => {
 						stats.deletes += 1;
 						stats.key_bytes += key.len() as u64;
+						family_deletes += 1;
+						family_key_bytes += key.len() as u64;
 						db_batch.delete_cf(&cf_handle, key);
 					}
 				}
 			}
+			debug!(
+				target: "infra_rdb::typed_db::durable_writer",
+				column_family = %column_family,
+				puts = family_puts,
+				deletes = family_deletes,
+				key_bytes = family_key_bytes,
+				value_bytes = family_value_bytes,
+				encoded_bytes = family_key_bytes.saturating_add(family_value_bytes),
+				native_bytes = db_batch.size_in_bytes().saturating_sub(family_native_start),
+				build_ms = family_started.elapsed().as_secs_f64() * 1_000.0,
+				"durable write column family"
+			);
 		}
 		stats.native_bytes = db_batch.size_in_bytes() as u64;
 		stats.native_build = started.elapsed();
