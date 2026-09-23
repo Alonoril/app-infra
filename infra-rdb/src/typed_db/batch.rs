@@ -35,6 +35,28 @@ mod tests {
 			matches!(&operations[1], WriteOp::Value { key, value } if key == &[41] && value == &[9; 32] && value.as_ptr() == pointer)
 		);
 	}
+
+	#[test]
+	fn append_shared_preserves_repeated_key_operation_order_and_moves_buffers() {
+		let key = vec![42];
+		let value = vec![7; 32];
+		let pointer = value.as_ptr();
+		let first = SchemaBatch::from_rows(HashMap::from([(
+			Cow::Borrowed("facts"),
+			vec![WriteOp::Deletion { key: key.clone() }],
+		)]));
+		let second = SchemaBatch::from_rows(HashMap::from([(
+			Cow::Borrowed("facts"),
+			vec![WriteOp::Value { key, value }],
+		)]));
+		first.append_shared(second);
+		let mut rows = first.into_rows();
+		let operations = rows.remove("facts").unwrap();
+		assert!(matches!(&operations[0], WriteOp::Deletion { key } if key == &[42]));
+		assert!(
+			matches!(&operations[1], WriteOp::Value { key, value } if key == &[42] && value == &[7; 32] && value.as_ptr() == pointer)
+		);
+	}
 }
 
 pub(crate) type SchemaBatchRows = HashMap<Cow<'static, str>, Vec<WriteOp>>;
@@ -64,7 +86,18 @@ impl SchemaBatch {
 	/// Key/value buffers are retained; callers must append fragments in their logical order.
 	pub fn append(&mut self, other: Self) {
 		let rows = self.rows.get_mut().expect("RdbBatchAppend: poisoned lock");
-		for (column_family, mut operations) in other.into_rows() {
+		Self::append_rows(rows, other.into_rows());
+	}
+
+	/// Moves a private batch into this one through a shared reference.
+	/// Operation order within each column family is preserved, and key/value buffers are retained.
+	pub fn append_shared(&self, other: Self) {
+		let mut rows = self.rows.lock().expect("RdbBatchAppend: poisoned lock");
+		Self::append_rows(&mut rows, other.into_rows());
+	}
+
+	fn append_rows(rows: &mut SchemaBatchRows, incoming: SchemaBatchRows) {
+		for (column_family, mut operations) in incoming {
 			match rows.entry(column_family) {
 				std::collections::hash_map::Entry::Vacant(entry) => {
 					entry.insert(operations);
