@@ -8,6 +8,7 @@ mod durable_batch;
 mod durable_writer;
 mod iterator;
 mod snapshot;
+mod sst_ingest;
 #[cfg(feature = "ttl")]
 mod ttl;
 mod utils;
