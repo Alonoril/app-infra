@@ -2,7 +2,7 @@ use crate::{
 	errors,
 	typed_db::{
 		batch::{SchemaBatch, WriteOp},
-		durable_batch::DurableWriteBatch,
+		durable_batch::{DurableWriteBatch, DurableWriteOp, DurableWriteStats},
 		iterator::{ScanDirection, SchemaIterator},
 		schema::{KeyCodec, Schema, ValueCodec},
 		utils::{DeUnc, IntoDbResult, OpenMode, default_write_options},
@@ -10,7 +10,7 @@ use crate::{
 };
 use infra_core::result::AppResult;
 use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions};
-use std::{collections::HashSet, fmt, path::Path};
+use std::{collections::HashSet, fmt, path::Path, time::Instant};
 use tracing::{info, warn};
 
 /// This DB is a typed RocksDB wrapper where all data passed in and out are typed according to
@@ -19,6 +19,18 @@ pub struct RksDB {
 	name: String, // for logging
 	pub(crate) inner: rocksdb::DB,
 	write_options: rocksdb::WriteOptions,
+}
+
+pub struct PreparedDurableWrite<'a> {
+	db: &'a RksDB,
+	batch: Option<DurableWriteBatch>,
+}
+
+impl PreparedDurableWrite<'_> {
+	pub fn write(mut self) -> AppResult<DurableWriteStats> {
+		self.db
+			.write_durable_batch_sync_with_stats(self.batch.take().expect("prepared batch is present"))
+	}
 }
 
 impl fmt::Debug for RksDB {
@@ -221,6 +233,17 @@ impl RksDB {
 		self.write_schemas(batch)
 	}
 
+	/// Deletes every row when the column family exists.
+	///
+	/// This is used by migrations that retire a schema which may be absent from
+	/// a fresh database but still present as an unrecognized legacy family.
+	pub fn clear_schema_if_exists<S: Schema>(&self) -> AppResult<()> {
+		if self.inner.cf_handle(S::COLUMN_FAMILY_NAME).is_none() {
+			return Ok(());
+		}
+		self.clear_schema::<S>()
+	}
+
 	pub fn multi_get<S: Schema>(&self, keys: &[S::Key]) -> AppResult<Vec<Option<S::Value>>> {
 		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 		let mut encoded_keys = vec![];
@@ -240,6 +263,28 @@ impl RksDB {
 		}
 
 		Ok(res_vec)
+	}
+
+	/// Reads multiple records using already encoded keys.
+	pub fn multi_get_encoded<S: Schema>(
+		&self,
+		keys: impl IntoIterator<Item = impl AsRef<[u8]>>,
+	) -> AppResult<Vec<Option<S::Value>>> {
+		let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
+		let encoded_keys = keys
+			.into_iter()
+			.map(|key| (&cf_handle, key.as_ref().to_vec()))
+			.collect::<Vec<_>>();
+		let results: Vec<Result<Option<Vec<u8>>, rocksdb::Error>> = self.inner.multi_get_cf(encoded_keys);
+		results
+			.into_iter()
+			.map(|result| {
+				result
+					.into_db_res()?
+					.map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
+					.transpose()
+			})
+			.collect()
 	}
 
 	pub fn multi_get_with_keys<'a, S: Schema>(
@@ -322,10 +367,63 @@ impl RksDB {
 	}
 
 	pub fn write_durable_batch_sync(&self, batch: DurableWriteBatch) -> AppResult<()> {
-		let mut options = rocksdb::WriteOptions::default();
-		options.set_sync(true);
-		options.disable_wal(false);
-		self.write_schemas_with_options(batch.into_schema_batch()?, &options)
+		self.write_durable_batch_sync_with_stats(batch).map(|_| ())
+	}
+
+	pub fn write_durable_batch_sync_with_stats(&self, batch: DurableWriteBatch) -> AppResult<DurableWriteStats> {
+		self.write_durable_batch_with_options(batch, true, true)
+	}
+
+	pub fn write_durable_batch_unlogged_with_stats(&self, batch: DurableWriteBatch) -> AppResult<DurableWriteStats> {
+		self.write_durable_batch_with_options(batch, false, false)
+	}
+
+	fn write_durable_batch_with_options(
+		&self,
+		batch: DurableWriteBatch,
+		sync: bool,
+		wal_enabled: bool,
+	) -> AppResult<DurableWriteStats> {
+		let started = Instant::now();
+		let mut stats = DurableWriteStats {
+			wal_enabled,
+			sync,
+			..DurableWriteStats::default()
+		};
+		for family in &batch.column_families {
+			for operation in &family.operations {
+				match operation {
+					DurableWriteOp::Value { key, value } => {
+						stats.puts = stats.puts.saturating_add(1);
+						stats.key_bytes = stats.key_bytes.saturating_add(key.len() as u64);
+						stats.value_bytes = stats.value_bytes.saturating_add(value.len() as u64);
+					}
+					DurableWriteOp::Deletion { key } => {
+						stats.deletes = stats.deletes.saturating_add(1);
+						stats.key_bytes = stats.key_bytes.saturating_add(key.len() as u64);
+					}
+				}
+			}
+		}
+		stats.native_bytes = stats.key_bytes.saturating_add(stats.value_bytes);
+		stats.native_build = started.elapsed();
+		let options = {
+			let mut options = rocksdb::WriteOptions::default();
+			options.set_sync(sync);
+			options.disable_wal(!wal_enabled);
+			options
+		};
+		let write_started = Instant::now();
+		self.write_schemas_with_options(batch.into_schema_batch()?, &options)?;
+		stats.write = write_started.elapsed();
+		Ok(stats)
+	}
+
+	pub fn prepare_durable_batch_sync(&self, batch: DurableWriteBatch) -> AppResult<PreparedDurableWrite<'_>> {
+		Ok(PreparedDurableWrite {
+			db: self,
+			batch: Some(batch),
+		})
 	}
 
 	fn write_schemas_with_options(&self, batch: SchemaBatch, options: &rocksdb::WriteOptions) -> AppResult<()> {
