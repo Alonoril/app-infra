@@ -4,7 +4,20 @@ use crate::{
 };
 use infra_core::result::AppResult;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
+use std::{borrow::Cow, time::Duration};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DurableWriteStats {
+	pub native_build: Duration,
+	pub write: Duration,
+	pub key_bytes: u64,
+	pub value_bytes: u64,
+	pub native_bytes: u64,
+	pub puts: u64,
+	pub deletes: u64,
+	pub wal_enabled: bool,
+	pub sync: bool,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DurableWriteOp {
@@ -166,5 +179,27 @@ impl DurableWriteBatch {
 		}
 
 		Ok(SchemaBatch::from_rows(rows))
+	}
+
+	pub fn append_schema_batch(&mut self, batch: SchemaBatch) {
+		let incoming = Self::from_schema_batch(batch);
+		for DurableColumnFamilyBatch {
+			column_family,
+			operations,
+		} in incoming.column_families
+		{
+			if let Some(existing) = self
+				.column_families
+				.iter_mut()
+				.find(|family| family.column_family == column_family)
+			{
+				existing.operations.extend(operations);
+			} else {
+				self.column_families.push(DurableColumnFamilyBatch {
+					column_family,
+					operations,
+				});
+			}
+		}
 	}
 }

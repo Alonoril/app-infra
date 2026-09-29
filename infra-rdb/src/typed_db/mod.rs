@@ -16,8 +16,9 @@ mod utils;
 // Re-export public types and traits
 pub use batch::{ColumnFamilyName, SchemaBatch};
 pub use core::RksDB;
-pub use durable_batch::{DurableColumnFamilyBatch, DurableWriteBatch, DurableWriteOp};
-pub use durable_writer::{DurableWriteStats, PreparedDurableWrite};
+pub use durable_batch::{DurableColumnFamilyBatch, DurableWriteBatch, DurableWriteOp, DurableWriteStats};
+// pub use durable_writer::{DurableWriteStats, PreparedDurableWrite};
+pub use durable_writer::PreparedDurableWrite;
 use infra_rdb_cfg::RocksdbConfig;
 pub use iterator::{ScanDirection, SchemaIterator};
 pub use schema::Schema;

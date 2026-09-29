@@ -159,6 +159,24 @@ impl SchemaBatch {
 		batches
 	}
 
+	/// Appends all operations from another batch, preserving their insertion order.
+	pub fn append(&mut self, other: SchemaBatch) {
+		let other_rows = other.into_rows();
+		let mut rows = self.rows.lock().expect("RdbBatchAppend: poisoned lock");
+		for (column_family, operations) in other_rows {
+			rows.entry(column_family).or_default().extend(operations);
+		}
+	}
+
+	/// Appends another batch through a shared reference.
+	pub fn append_shared(&self, other: SchemaBatch) {
+		let other_rows = other.into_rows();
+		let mut rows = self.rows.lock().expect("RdbBatchAppendShared: poisoned lock");
+		for (column_family, operations) in other_rows {
+			rows.entry(column_family).or_default().extend(operations);
+		}
+	}
+
 	pub(crate) fn into_rows(self) -> SchemaBatchRows {
 		self.rows.into_inner().expect("RdbBatchIntoRows: poisoned lock")
 	}
