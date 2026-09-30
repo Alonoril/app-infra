@@ -3,10 +3,15 @@ use crate::errors::RdbErr;
 use infra_core::{err, result::AppResult};
 
 impl RksDB {
+	/// Lists all physical families, including legacy families outside application schemas.
+	pub fn column_family_names(&self) -> AppResult<Vec<String>> {
+		rocksdb::DB::list_cf(&rocksdb::Options::default(), self.inner.path()).into_db_res()
+	}
+
 	/// Checks every existing column family without decoding or collecting values.
 	/// Intended for startup guards and offline maintenance, not hot paths.
 	pub fn has_any_rows(&self) -> AppResult<bool> {
-		let families = rocksdb::DB::list_cf(&rocksdb::Options::default(), self.inner.path()).into_db_res()?;
+		let families = self.column_family_names()?;
 		for family in families {
 			let handle = self.get_cf_handle(&family)?;
 			let mut iterator = self.inner.raw_iterator_cf(&handle);
