@@ -1,25 +1,8 @@
-use super::{DurableWriteBatch, DurableWriteOp, IntoDbResult, RksDB};
+use super::{DurableWriteBatch, DurableWriteOp, DurableWriteStats, IntoDbResult, RksDB};
 use crate::errors::{self, RdbDetail};
 use infra_core::result::AppResult;
-use std::{
-	collections::HashSet,
-	time::{Duration, Instant},
-};
+use std::{collections::HashSet, time::Instant};
 use tracing::debug;
-
-/// Encoded logical bytes and native batch size are different from disk/WAL bytes.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct DurableWriteStats {
-	pub native_build: Duration,
-	pub write: Duration,
-	pub key_bytes: u64,
-	pub value_bytes: u64,
-	pub native_bytes: u64,
-	pub puts: u64,
-	pub deletes: u64,
-	pub wal_enabled: bool,
-	pub sync: bool,
-}
 
 /// A native batch bound to the database that resolved its column families.
 /// Preparing it never writes state; `write` preserves the requested WAL/sync mode.

@@ -180,26 +180,4 @@ impl DurableWriteBatch {
 
 		Ok(SchemaBatch::from_rows(rows))
 	}
-
-	pub fn append_schema_batch(&mut self, batch: SchemaBatch) {
-		let incoming = Self::from_schema_batch(batch);
-		for DurableColumnFamilyBatch {
-			column_family,
-			operations,
-		} in incoming.column_families
-		{
-			if let Some(existing) = self
-				.column_families
-				.iter_mut()
-				.find(|family| family.column_family == column_family)
-			{
-				existing.operations.extend(operations);
-			} else {
-				self.column_families.push(DurableColumnFamilyBatch {
-					column_family,
-					operations,
-				});
-			}
-		}
-	}
 }
