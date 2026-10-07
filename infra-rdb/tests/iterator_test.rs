@@ -161,6 +161,24 @@ fn test_seek_to_first() {
 }
 
 #[test]
+fn snapshot_iterator_and_multi_get_observe_the_same_sequence() {
+	let db = TestDB::new();
+	let snapshot = db.snapshot();
+	let first_key = TestKey(1, 0, 0);
+	let snapshot_values = snapshot.multi_get::<TestSchema>(&[TestKey(1, 0, 0)]).unwrap();
+
+	db.put::<TestSchema>(&first_key, &TestValue(999)).unwrap();
+	db.put::<TestSchema>(&TestKey(3, 0, 0), &TestValue(300)).unwrap();
+
+	let mut iterator = snapshot.iter::<TestSchema>().unwrap();
+	iterator.seek_to_first();
+	let values = iterator.map(|row| row.unwrap().1.0).collect::<Vec<_>>();
+
+	assert_eq!(snapshot_values, [Some(TestValue(100))]);
+	assert_eq!(values, [100, 102, 104, 110, 112, 114, 200, 202]);
+}
+
+#[test]
 fn test_seek_to_last() {
 	let db = TestDB::new();
 

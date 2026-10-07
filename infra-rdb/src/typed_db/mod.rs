@@ -8,6 +8,7 @@ mod durable_batch;
 mod durable_writer;
 mod iterator;
 mod maintenance;
+mod raw_statistics;
 mod snapshot;
 mod sst_ingest;
 #[cfg(feature = "ttl")]
@@ -21,6 +22,7 @@ pub use durable_batch::{DurableColumnFamilyBatch, DurableWriteBatch, DurableWrit
 pub use durable_writer::PreparedDurableWrite;
 use infra_rdb_cfg::RocksdbConfig;
 pub use iterator::{ScanDirection, SchemaIterator};
+pub use raw_statistics::RawColumnFamilyStats;
 pub use schema::Schema;
 pub use snapshot::RksDBSnapshot;
 pub use utils::IntoDbResult;

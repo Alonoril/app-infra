@@ -1,10 +1,11 @@
 use super::{
 	core::RksDB,
+	iterator::{ScanDirection, SchemaIterator},
 	schema::{KeyCodec, Schema, ValueCodec},
 	utils::IntoDbResult,
 };
 use infra_core::result::AppResult;
-use rocksdb::{DB, SnapshotWithThreadMode};
+use rocksdb::{DB, ReadOptions, SnapshotWithThreadMode};
 
 /// A typed read view pinned to one RocksDB sequence number.
 pub struct RksDBSnapshot<'db> {
@@ -23,6 +24,13 @@ impl RksDB {
 }
 
 impl RksDBSnapshot<'_> {
+	/// Returns a forward schema iterator pinned to this snapshot's sequence number.
+	pub fn iter<S: Schema>(&self) -> AppResult<SchemaIterator<'_, S>> {
+		let cf_handle = self.db.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
+		let db_iter = self.snapshot.raw_iterator_cf_opt(&cf_handle, ReadOptions::default());
+		Ok(SchemaIterator::new(db_iter, ScanDirection::Forward))
+	}
+
 	/// Reads one typed value from this snapshot.
 	pub fn get<S: Schema>(&self, key: &S::Key) -> AppResult<Option<S::Value>> {
 		let encoded_key = <S::Key as KeyCodec<S>>::encode_key(key)?;
