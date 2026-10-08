@@ -65,7 +65,19 @@ pub fn build_table_opts(rocksdb_config: &RocksdbConfig) -> (BlockBasedOptions, C
 	let cache = Cache::new_lru_cache(rocksdb_config.block_cache_size as usize);
 	table_opts.set_block_cache(&cache);
 
-	table_opts.set_hybrid_ribbon_filter(10.0, 1);
+	if rocksdb_config.partition_filters {
+		// Partitioned filters require a two-level index. Cut hash collection at
+		// partition boundaries instead of retaining hashes for the entire SST.
+		table_opts.set_index_type(rocksdb::BlockBasedIndexType::TwoLevelIndexSearch);
+		table_opts.set_partition_filters(true);
+		table_opts.set_metadata_block_size(rocksdb_config.metadata_block_size);
+	}
+	if rocksdb_config.use_ribbon_filter {
+		table_opts.set_hybrid_ribbon_filter(10.0, 1);
+	} else {
+		// Full Bloom filters support partitioning; block-based filters do not.
+		table_opts.set_bloom_filter(10.0, false);
+	}
 	table_opts.set_format_version(5);
 
 	// 返回 cache 是为了延长其生命周期（避免被 drop 后 table_opts 内引用失效）
@@ -114,8 +126,10 @@ pub fn build_cfds_with_post(
 		cf_opts.set_level_zero_slowdown_writes_trigger(rdb_cfg.level0_slowdown_writes_trigger);
 		cf_opts.set_level_zero_stop_writes_trigger(rdb_cfg.level0_stop_writes_trigger);
 
-		// 增大 SST 文件和 level 容量
-		cf_opts.set_target_file_size_base(256 * 1024 * 1024);
+		// Keep the compaction output target constant across levels. This is an
+		// output target, not a bound on flush files or total construction memory.
+		cf_opts.set_target_file_size_base(rdb_cfg.target_file_size_base);
+		cf_opts.set_target_file_size_multiplier(1);
 		cf_opts.set_max_bytes_for_level_base(1024 * 1024 * 1024);
 
 		// 写入优先时，底层再压缩；L0/L1 可不压缩

@@ -61,6 +61,14 @@ pub struct RocksdbConfig {
 	pub block_size: u64,
 	/// Whether cache index and filter blocks into block cache.
 	pub cache_index_and_filter_blocks: bool,
+	/// Partition full filters and indexes to avoid collecting hashes for an entire SST.
+	pub partition_filters: bool,
+	/// Target index/filter partition size in bytes; not a process memory limit.
+	pub metadata_block_size: usize,
+	/// Use hybrid Ribbon (L1+) instead of Bloom. Ribbon needs more construction memory.
+	pub use_ribbon_filter: bool,
+	/// Target compaction output SST size in bytes; not a strict file size limit.
+	pub target_file_size_base: u64,
 	/// Increase parallelism to number of CPU cores
 	pub increase_parallelism: i32,
 	/// Write buffer size for RocksDB
@@ -96,6 +104,10 @@ impl Default for RocksdbConfig {
 			block_size: 4 * (1u64 << 10),
 			// Whether cache index and filter blocks into block cache.
 			cache_index_and_filter_blocks: false,
+			partition_filters: true,
+			metadata_block_size: 4 * 1024,
+			use_ribbon_filter: false,
+			target_file_size_base: 64 * 1024 * 1024,
 			// Increase parallelism to number of CPU cores, default to 4
 			increase_parallelism: 4,
 			// Write buffer size for RocksDB default to 256MB
