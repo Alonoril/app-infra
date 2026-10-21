@@ -10,6 +10,7 @@ description = "A short description of the project."
 resolver = "3"
 members = [
 	"infra-core",
+	"infra-sql",
 	"infra-rdb/infra-rdb-cfg",
 	"infra-rdb",
 	"infra-web/axum-resp-macro",
@@ -19,6 +20,7 @@ members = [
 
 [workspace.dependencies]
 infra-core = { path = "infra-core" }
+infra-sql = { path = "infra-sql" }
 infra-rdb-cfg = { path = "infra-rdb/infra-rdb-cfg" }
 infra-rdb = { path = "infra-rdb" }
 axum-resp-macro = { path = "infra-web/axum-resp-macro" }

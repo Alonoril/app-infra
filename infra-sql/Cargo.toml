@@ -1,0 +1,30 @@
+[package]
+name = "infra-sql"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+infra-core.workspace = true
+anyhow.workspace = true
+async-trait = "0.1"
+bigdecimal = { version = "0.4", features = ["serde"] }
+percent-encoding = "2"
+ruint = "1.15"
+sea-orm = { version = "1.1", default-features = false, features = ["runtime-tokio-rustls", "time", "with-bigdecimal"] }
+serde.workspace = true
+tracing.workspace = true
+url = "2"
+
+[features]
+pgsql = ["sea-orm/sqlx-postgres"]
+sqlite = ["sea-orm/sqlx-sqlite"]
+
+#mysql = ["sea-orm/sqlx-mysql"]
+#default = ["sqlite"]
+
+[dev-dependencies]
+
