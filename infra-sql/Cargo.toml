@@ -14,7 +14,7 @@ async-trait = "0.1"
 bigdecimal = { version = "0.4", features = ["serde"] }
 percent-encoding = "2"
 ruint = "1.15"
-sea-orm = { version = "1.1", default-features = false, features = ["runtime-tokio-rustls", "time", "with-bigdecimal"] }
+sea-orm = { version = "2", default-features = false, features = ["macros", "sqlx-postgres", "runtime-tokio-rustls", "with-json", "with-uuid", "with-chrono", "with-bigdecimal"] }
 serde.workspace = true
 tracing.workspace = true
 url = "2"

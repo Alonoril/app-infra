@@ -8,7 +8,7 @@ impl ServerVersion for DatabaseConn {
 		let stmt = Statement::from_string(DbBackend::Postgres, "SELECT version()");
 		let row = self
 			.pool
-			.query_one(stmt)
+			.query_one_raw(stmt)
 			.await
 			.map_err(map_err_logged!(DBErr::GetVersion))?;
 		let row = row.ok_or_else(ok_or_logged!(DBErr::VersionNotFound))?;
