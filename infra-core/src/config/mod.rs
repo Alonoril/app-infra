@@ -36,7 +36,8 @@ where
 			.merge(Yaml::file_exact(path))
 			.merge(Env::prefixed("APP__").split("__"))
 			.extract()
-			.map_err(map_err_logged!(SysErr::ConfigLoadFailed))?;
+			// .map_err(map_err_logged!(SysErr::ConfigLoadFailed))
+			.expect("Config load failed");
 
 		Ok(config)
 	}
