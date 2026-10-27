@@ -9,13 +9,14 @@ description = "A short description of the project."
 [workspace]
 resolver = "3"
 members = [
-	"infra-core",
-	"infra-sql",
-	"infra-rdb/infra-rdb-cfg",
-	"infra-rdb",
-	"infra-web/axum-resp-macro",
-	"infra-web",
-	"infra-tracing",
+    "infra-core",
+    "infra-sql",
+    "infra-rdb/infra-rdb-cfg",
+    "infra-rdb",
+    "infra-web/axum-resp-macro",
+    "infra-web",
+    "infra-tracing",
+    "alloy-ext"
 ]
 
 [workspace.dependencies]
@@ -54,3 +55,12 @@ tracing-appender = "0.2"
 tracing-subscriber = "0.3"
 utoipa = { version = "6" }
 uuid = { version = "1", features = ["v4"] }
+
+alloy = { version = "2", default-features = false }
+async-trait = { version = "0.1" }
+futures = { version = "0.3" }
+hyper = { version = "1" }
+parking_lot = { version = "0.13" }
+reqwest = { version = "0.12" }
+serde_yaml = { version = "0.9" }
+tower-service = "0.3"
