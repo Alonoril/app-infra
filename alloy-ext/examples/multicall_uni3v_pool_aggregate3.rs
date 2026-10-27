@@ -1,7 +1,9 @@
-use alloy::network::Network;
-use alloy::primitives::{Address, U160, U256, address};
-use alloy::providers::{CallInfoTrait, CallTuple, MulticallBuilder, MulticallItem, Provider, ProviderBuilder};
-use alloy::sol_types::SolCall;
+use alloy::{
+	network::Network,
+	primitives::{Address, U160, U256, address},
+	providers::{CallInfoTrait, CallTuple, MulticallBuilder, MulticallItem, Provider, ProviderBuilder},
+	sol_types::SolCall,
+};
 
 alloy::sol! {
    #[sol(rpc)]

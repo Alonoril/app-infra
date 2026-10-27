@@ -4,17 +4,21 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use alloy::primitives::Address;
-use alloy::rpc::json_rpc::{Id, Request, RequestPacket, ResponsePacket, SerializedRequest};
-use alloy::transports::{TransportError, TransportResult};
+use alloy::{
+	primitives::Address,
+	rpc::json_rpc::{Id, Request, RequestPacket, ResponsePacket, SerializedRequest},
+	transports::{TransportError, TransportResult},
+};
 use infra_core::{result::AppResult, rt_pool::Tokio};
 use parking_lot::RwLock;
 use tokio::time::{interval, timeout};
 use tower::Service;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::error::AyeErr;
-use crate::transports::layers::{HealthCheckConfig, PerformanceBenchmarkConfig, ProbeMethod, ScoredTransport};
+use crate::{
+	error::AyeErr,
+	transports::layers::{HealthCheckConfig, PerformanceBenchmarkConfig, ProbeMethod, ScoredTransport},
+};
 use infra_core::{err, map_err};
 
 /// 健康检查器状态

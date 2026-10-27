@@ -15,8 +15,7 @@ use alloy_ext::transports::layers::{
 	HealthCheckConfig, PerformanceBenchmarkConfig, ProbeMethod, SerialFailoverLayer, WarmupMethod,
 };
 use tower::ServiceBuilder;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

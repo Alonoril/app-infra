@@ -1,5 +1,7 @@
-use alloy::rpc::json_rpc::{ErrorPayload, Id, Request, RequestPacket, ResponsePacket, SerializedRequest};
-use alloy::transports::{TransportError, TransportErrorKind, TransportFut};
+use alloy::{
+	rpc::json_rpc::{ErrorPayload, Id, Request, RequestPacket, ResponsePacket, SerializedRequest},
+	transports::{TransportError, TransportErrorKind, TransportFut},
+};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
@@ -1106,8 +1108,10 @@ mod tests {
 
 	#[test]
 	fn test_layer_trait_implementation() {
-		use alloy::rpc::json_rpc::{RequestPacket, ResponsePacket};
-		use alloy::transports::{TransportError, TransportErrorKind, TransportFut};
+		use alloy::{
+			rpc::json_rpc::{RequestPacket, ResponsePacket},
+			transports::{TransportError, TransportErrorKind, TransportFut},
+		};
 		use std::task::{Context, Poll};
 		use tower::Service;
 

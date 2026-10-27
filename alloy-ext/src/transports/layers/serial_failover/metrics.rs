@@ -1,11 +1,15 @@
 use crate::transports::layers::{ScoringAlgorithm, SerialFailoverConfig};
-use alloy::rpc::json_rpc::{RequestPacket, ResponsePacket};
-use alloy::transports::{TransportError, TransportFut};
+use alloy::{
+	rpc::json_rpc::{RequestPacket, ResponsePacket},
+	transports::{TransportError, TransportFut},
+};
 use parking_lot::RwLock;
-use std::collections::VecDeque;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::{
+	collections::VecDeque,
+	sync::Arc,
+	task::{Context, Poll},
+	time::{Duration, Instant},
+};
 use tower_service::Service;
 use tracing::debug;
 
