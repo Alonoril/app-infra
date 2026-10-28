@@ -985,11 +985,29 @@ mod tests {
 	use super::*;
 	use alloy::providers::mock::MockTransport;
 	use serde_json::json;
+	use std::task::{Context, Poll};
+
+	#[derive(Clone)]
+	struct TestTransport;
+
+	impl Service<RequestPacket> for TestTransport {
+		type Error = TransportError;
+		type Future = std::future::Pending<Result<ResponsePacket, TransportError>>;
+		type Response = ResponsePacket;
+
+		fn poll_ready(&mut self, _context: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+			Poll::Ready(Ok(()))
+		}
+
+		fn call(&mut self, _request: RequestPacket) -> Self::Future {
+			std::future::pending()
+		}
+	}
 
 	#[tokio::test]
 	async fn test_health_checker_creation() {
 		let config = HealthCheckConfig::default();
-		let checker = HealthChecker::<()>::new(config);
+		let checker = HealthChecker::<TestTransport>::new(config);
 
 		let state = checker.get_state();
 		assert!(!state.running);
@@ -1000,9 +1018,9 @@ mod tests {
 	#[tokio::test]
 	async fn test_health_checker_register_unregister() {
 		let config = HealthCheckConfig::default();
-		let checker = HealthChecker::<()>::new(config);
+		let checker = HealthChecker::<TestTransport>::new(config);
 
-		let transport = Arc::new(ScoredTransport::new(1, ()));
+		let transport = Arc::new(ScoredTransport::new(1, TestTransport));
 
 		// 注册节点
 		checker.register_node(1, &transport);
@@ -1018,7 +1036,7 @@ mod tests {
 		let mut config = HealthCheckConfig::default();
 		config.enabled = false;
 
-		let checker = HealthChecker::<()>::new(config);
+		let checker = HealthChecker::<TestTransport>::new(config);
 
 		// 启动应该立即返回成功
 		assert!(checker.start_unconstrained().await.is_ok());

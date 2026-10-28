@@ -44,6 +44,18 @@ const ETHEREUM_JSON_RPC_ERROR_CODES: [i64; 11] = [
 ];
 
 fn is_fail_fast_rpc_error(err_payload: &ErrorPayload) -> bool {
+	if err_payload.code == -32000 {
+		let normalized = err_payload.message.as_ref().to_ascii_lowercase();
+		if normalized.contains("missing trie node")
+			|| (normalized.contains("historical state")
+				&& ["unavailable", "not available", "missing"]
+					.iter()
+					.any(|reason| normalized.contains(reason)))
+		{
+			return false;
+		}
+	}
+
 	if ETHEREUM_JSON_RPC_ERROR_CODES.contains(&err_payload.code) {
 		return true;
 	}
@@ -1078,6 +1090,29 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::borrow::Cow;
+
+	#[test]
+	fn historical_state_rpc_errors_are_failover_candidates() {
+		let error = ErrorPayload {
+			code: -32000,
+			message: Cow::Borrowed("missing trie node 0xabc"),
+			data: None,
+		};
+
+		assert!(!is_fail_fast_rpc_error(&error));
+	}
+
+	#[test]
+	fn unrelated_rpc_server_errors_remain_fail_fast() {
+		let error = ErrorPayload {
+			code: -32000,
+			message: Cow::Borrowed("insufficient funds for transfer"),
+			data: None,
+		};
+
+		assert!(is_fail_fast_rpc_error(&error));
+	}
 
 	#[tokio::test]
 	async fn test_serial_failover_layer_creation() {
