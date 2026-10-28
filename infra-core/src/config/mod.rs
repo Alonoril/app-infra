@@ -2,10 +2,7 @@ mod bs_cfg;
 
 pub use bs_cfg::{BaseConfig, RtEnv};
 
-use crate::{
-	map_err_logged,
-	result::{AppResult, SysErr},
-};
+use crate::result::AppResult;
 use figment::{
 	Figment,
 	providers::{Env, Format, Toml, Yaml},
