@@ -13,7 +13,7 @@ use infra_core::{result::AppResult, rt_pool::Tokio};
 use parking_lot::RwLock;
 use tokio::time::{interval, timeout};
 use tower::Service;
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{Instrument, debug, error, info, instrument, trace, warn};
 
 use crate::{
 	error::AyeErr,
@@ -466,7 +466,8 @@ where
 		let mut check_tasks = Vec::new();
 		for (node_id, transport) in nodes {
 			let config = self.config.clone();
-			let task = Tokio.spawn(async move { Self::check_single_node(node_id, transport, config).await });
+			let task =
+				Tokio.spawn(async move { Self::check_single_node(node_id, transport, config).await }.in_current_span());
 			check_tasks.push(task);
 		}
 
@@ -503,6 +504,7 @@ where
 	}
 
 	/// 检查单个节点
+	#[instrument(name = "rpc.health_probe", skip(transport, config))]
 	async fn check_single_node(
 		node_id: usize,
 		transport: Arc<ScoredTransport<S>>,
@@ -609,7 +611,9 @@ where
 				let config = benchmark_config.clone();
 				let transport = transport.clone();
 				let node_id = *node_id;
-				let task = Tokio.spawn(async move { Self::benchmark_single_node(node_id, transport, config).await });
+				let task = Tokio.spawn(
+					async move { Self::benchmark_single_node(node_id, transport, config).await }.in_current_span(),
+				);
 				chunk_tasks.push(task);
 			}
 
@@ -672,6 +676,7 @@ where
 	}
 
 	/// 对单个节点进行基准测试
+	#[instrument(name = "rpc.performance_probe", skip(transport, config))]
 	async fn benchmark_single_node(
 		node_id: usize,
 		transport: Arc<ScoredTransport<S>>,
