@@ -27,12 +27,22 @@ macro_rules! impl_try_from_bigdecimal_to_dbuint {
 			type Error = &'static str;
 
 			fn try_from(value: BigDecimal) -> Result<Self, Self::Error> {
-				let (big_int, scale) = value.into_bigint_and_exponent();
-				if scale != 0 {
+				let (mut big_int, scale) = value.normalized().into_bigint_and_exponent();
+				if scale > 0 {
 					return Err("BigDecimal has fractional part");
 				}
 				if big_int.sign() == Sign::Minus {
 					return Err("negative value");
+				}
+
+				// PostgreSQL binary NUMERIC may decode integers with a negative scale.
+				// Bound the exponent before allocating a power of ten.
+				if scale < 0 {
+					let exponent = scale.unsigned_abs();
+					if exponent > ($byte_size * 8) as u64 {
+						return Err(concat!("value too large for ", stringify!($uint_type)));
+					}
+					big_int *= BigInt::from(10).pow(exponent as u32);
 				}
 
 				let big_uint = big_int.to_biguint().ok_or("negative value")?;
@@ -56,3 +66,25 @@ impl_from_dbuint_to_bigdecimal!(DbU128, U128, 16);
 
 impl_try_from_bigdecimal_to_dbuint!(DbU256, U256, 32);
 impl_try_from_bigdecimal_to_dbuint!(DbU128, U128, 16);
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	#[test]
+	fn integer_scales_preserve_value_and_reject_fractions_and_overflow() {
+		for encoded in ["100000000000000000000", "1e20", "100000000000000000000.000", "0.000"] {
+			let decimal: BigDecimal = encoded.parse().unwrap();
+			let actual = DbU256::try_from(decimal.clone()).unwrap();
+			assert_eq!(BigDecimal::from(actual), decimal);
+			assert_eq!(BigDecimal::from(DbU128::try_from(decimal.clone()).unwrap()), decimal);
+		}
+		for encoded in ["0.1", "1.01", "-1", "1e1000"] {
+			let decimal: BigDecimal = encoded.parse().unwrap();
+			assert!(DbU256::try_from(decimal.clone()).is_err());
+			assert!(DbU128::try_from(decimal).is_err());
+		}
+		let maximum = BigDecimal::from(DbU256::from(U256::MAX));
+		assert!(DbU256::try_from(maximum.clone()).is_ok());
+		assert!(DbU256::try_from(maximum + BigDecimal::from(1)).is_err());
+	}
+}
