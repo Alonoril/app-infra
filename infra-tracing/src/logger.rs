@@ -3,7 +3,12 @@
 use crate::appender::CompressingRollingFileAppender;
 use infra_core::config::{BaseConfig, RtEnv};
 use serde::Deserialize;
-use std::{panic, path::PathBuf, thread};
+use std::{
+	borrow::Cow,
+	panic,
+	path::{Path, PathBuf},
+	thread,
+};
 use tracing::{error, level_filters::LevelFilter};
 use tracing_appender::non_blocking::{ErrorCounter, NonBlocking, NonBlockingBuilder, WorkerGuard};
 use tracing_subscriber::{
@@ -55,12 +60,19 @@ impl Logger {
 	pub fn with_path(self, path: PathBuf) -> Self {
 		Self { path, ..self }
 	}
+	fn log_directory(&self) -> Cow<'_, Path> {
+		if self.path.ends_with("logs") {
+			Cow::Borrowed(&self.path)
+		} else {
+			Cow::Owned(self.path.join("logs"))
+		}
+	}
 
 	pub fn init(&self, app_args: &BaseConfig) -> LoggerGuard {
 		let (non_blocking, guard) = match app_args.rt_env {
 			RtEnv::Development => non_blocking(std::io::stdout()),
 			_ => {
-				let dir = self.path.join("logs");
+				let dir = self.log_directory();
 				let file_logger = CompressingRollingFileAppender::daily_gzip_with_max_log_files(
 					dir,
 					self.file_name.as_str(),
@@ -241,6 +253,21 @@ mod tests {
 	};
 	use tracing_appender::non_blocking::NonBlockingBuilder;
 	use tracing_subscriber::{layer::SubscriberExt, registry};
+
+	#[test]
+	fn log_directory_preserves_logs_component_and_appends_it_to_other_paths() {
+		for (configured, expected) in [
+			("/var/lib/wallet/logs", "/var/lib/wallet/logs"),
+			("/var/lib/wallet/logs/", "/var/lib/wallet/logs"),
+			("logs", "logs"),
+			("/var/lib/wallet", "/var/lib/wallet/logs"),
+			("/var/lib/wallet/app-logs", "/var/lib/wallet/app-logs/logs"),
+			("", "logs"),
+		] {
+			let logger = Logger::default().with_path(configured.into());
+			assert_eq!(logger.log_directory().as_ref(), std::path::Path::new(expected));
+		}
+	}
 
 	#[derive(Clone, Default)]
 	struct SharedWriter(Arc<Mutex<Vec<u8>>>);
